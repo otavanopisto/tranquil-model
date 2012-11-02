@@ -1,6 +1,6 @@
 package fi.tranquil.instructions;
 
-import fi.tranquil.impl.TranquilizingContext;
+import fi.tranquil.TranquilizingContext;
 
 public class PathInstructionSelector implements InstructionSelector {
 

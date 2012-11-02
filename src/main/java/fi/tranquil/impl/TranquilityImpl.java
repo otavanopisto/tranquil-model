@@ -24,6 +24,7 @@ import fi.tranquil.TranquilModel;
 import fi.tranquil.TranquilModelEntity;
 import fi.tranquil.TranquilModelType;
 import fi.tranquil.Tranquility;
+import fi.tranquil.TranquilizingContext;
 import fi.tranquil.instructions.ClassInstructionSelector;
 import fi.tranquil.instructions.Instruction;
 import fi.tranquil.instructions.InstructionSelector;

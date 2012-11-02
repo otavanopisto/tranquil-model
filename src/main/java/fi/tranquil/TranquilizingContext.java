@@ -1,4 +1,4 @@
-package fi.tranquil.impl;
+package fi.tranquil;
 
 public class TranquilizingContext {
 
