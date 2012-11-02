@@ -1,5 +1,6 @@
 package fi.tranquil;
 
+import fi.tranquil.impl.TranquilityImpl;
 import fi.tranquil.instructions.PropertyInjectInstruction;
 import fi.tranquil.instructions.PropertySkipInstruction;
 import fi.tranquil.instructions.PropertyTypeInstruction;

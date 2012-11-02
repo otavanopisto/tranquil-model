@@ -1,4 +1,4 @@
-package fi.tranquil;
+package fi.tranquil.impl;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,7 +18,15 @@ import javassist.NotFoundException;
 
 import javax.persistence.Entity;
 
+import fi.tranquil.TranquilEntity;
+import fi.tranquil.TranquilModel;
+import fi.tranquil.TranquilModelEntity;
+import fi.tranquil.TranquilModelType;
+import fi.tranquil.Tranquility;
+import fi.tranquil.instructions.ClassInstructionSelector;
 import fi.tranquil.instructions.Instruction;
+import fi.tranquil.instructions.InstructionSelector;
+import fi.tranquil.instructions.PathInstructionSelector;
 import fi.tranquil.instructions.PropertyInjectInstruction;
 import fi.tranquil.instructions.PropertySkipInstruction;
 import fi.tranquil.instructions.PropertyTypeInstruction;
@@ -34,17 +42,35 @@ public class TranquilityImpl implements Tranquility {
   
   @Override
   public TranquilModelEntity entity(Object entity) {
-    return tranquilizeEntity("", entity);
+    Class<?> entityClass = entity.getClass();
+    return tranquilizeEntity(new TranquilizingContext(entityClass, ""), entity);
   }
    
   @Override
   public TranquilModelEntity[] entities(Object[] entities) {
-    return tranquilizeEntities("", entities);
+    if (entities == null)
+      return null;
+    
+    if (entities.length == 0)
+      return new TranquilModelEntity[0];
+    
+    Class<?> entityClass = entities[0].getClass();
+    
+    return tranquilizeEntities(new TranquilizingContext(entityClass, ""), entities);
   }
   
   @Override
   public Collection<TranquilModelEntity> entities(Collection<?> entities) {
-    return tranquilizeEntities("", entities);
+    if (entities == null)
+      return null;
+    
+    if (entities.isEmpty()) {
+      return new ArrayList<>();
+    }
+    
+    Class<?> entityClass = entities.iterator().next().getClass();
+    
+    return tranquilizeEntities(new TranquilizingContext(entityClass, ""), entities);
   }
   
   @Override
@@ -54,12 +80,21 @@ public class TranquilityImpl implements Tranquility {
 
   @Override
   public Tranquility addInstruction(String path, Instruction instruction) {
-    getInstructionsList(path).add(instruction);
-    return this;
+    return addInstruction(new PathInstructionSelector(path), instruction);
   }
 
-  private TranquilModelEntity tranquilizeEntity(String path, Object entity) {
-    List<Instruction> pathInstructions = getInstructionsList(path);
+  @Override
+  public Tranquility addInstruction(Class<?> entityClass, Instruction instruction) {
+    return addInstruction(new ClassInstructionSelector(entityClass), instruction);
+  }
+
+  public Tranquility addInstruction(InstructionSelector selector, Instruction instruction) {
+    instructions.add(new InstructionItem(selector, instruction));
+    return this;
+  }
+  
+  private TranquilModelEntity tranquilizeEntity(TranquilizingContext context, Object entity) {
+    List<Instruction> pathInstructions = resolveInstructions(context);
     TranquilModelType type = resolveEntityType(pathInstructions, TranquilModelType.COMPACT);
     
     Class<?> tranquilModelClass = tranquilityEntityFactory.findTranquileModel(entity.getClass(), type);
@@ -72,9 +107,10 @@ public class TranquilityImpl implements Tranquility {
 
         String[] modelProperties = getModelProperties(tranquilModelClass);
         for (String modelProperty : modelProperties) {
-          
-          String propertyPath = ("".equals(path) ? "" : path + ".") + modelProperty;
-          List<Instruction> propertyInstructions = getInstructionsList(propertyPath);
+          Class<?> propertyClass = propertyAccessor.getFieldType(entity.getClass(), modelProperty);
+          String propertyPath = ("".equals(context.getPath()) ? "" : context.getPath() + ".") + modelProperty;
+          TranquilizingContext propertyContext = new TranquilizingContext(propertyClass, propertyPath);
+          List<Instruction> propertyInstructions = resolveInstructions(propertyContext);
           
           boolean skip = resolveSkip(propertyInstructions);
           if (!skip) {
@@ -97,7 +133,7 @@ public class TranquilityImpl implements Tranquility {
                     }
                   break;
                   case COMPLETE:
-                    TranquilModelEntity tranquilizedEntity = tranquilizeEntity(propertyPath, entityValue);
+                    TranquilModelEntity tranquilizedEntity = tranquilizeEntity(propertyContext, entityValue);
                     if (tranquilizedEntity != null) {
                       propertyAccessor.storeProperty(tranquilModel, modelProperty, tranquilizedEntity);
                     }
@@ -124,7 +160,7 @@ public class TranquilityImpl implements Tranquility {
                   break;
                   case COMPLETE:
                     // Complete collections are stored as tranqulized entities
-                    Collection<TranquilModelEntity> tranquilizedEntities = tranquilizeEntities(propertyPath, (Collection<?>) entityValue);
+                    Collection<TranquilModelEntity> tranquilizedEntities = tranquilizeEntities(propertyContext, (Collection<?>) entityValue);
                     propertyAccessor.storeProperty(tranquilModel, modelProperty, tranquilizedEntities);
                   break;
                 }
@@ -148,12 +184,12 @@ public class TranquilityImpl implements Tranquility {
                   break;
                   case COMPLETE:
                     // Complete collections are stored as tranqualized entities
-                    Collection<TranquilModelEntity> tranquilizedEntities = tranquilizeEntities(propertyPath, (Collection<?>) entityValue);
+                    Collection<TranquilModelEntity> tranquilizedEntities = tranquilizeEntities(propertyContext, (Collection<?>) entityValue);
                     propertyAccessor.storeProperty(tranquilModel, modelProperty, tranquilizedEntities);
                   break;
                 }
               	
-              	TranquilModelEntity[] tranquilizedEntities = tranquilizeEntities(propertyPath, (Object[]) entityValue);
+              	TranquilModelEntity[] tranquilizedEntities = tranquilizeEntities(propertyContext, (Object[]) entityValue);
                 propertyAccessor.storeProperty(tranquilModel, modelProperty, tranquilizedEntities);
 
               } else {
@@ -180,19 +216,19 @@ public class TranquilityImpl implements Tranquility {
     }
   }
 
-  private TranquilModelEntity[] tranquilizeEntities(String path, Object[] entities) {
+  private TranquilModelEntity[] tranquilizeEntities(TranquilizingContext context, Object[] entities) {
     TranquilModelEntity[] result = new TranquilModelEntity[entities.length];
     for (int i = 0, l = entities.length; i < l; i++) {
-      result[i] = tranquilizeEntity(path, entities[i]);
+      result[i] = tranquilizeEntity(context, entities[i]);
     }
 
     return result;
   }
 
-  private Collection<TranquilModelEntity> tranquilizeEntities(String path, Collection<?> entities) {
+  private Collection<TranquilModelEntity> tranquilizeEntities(TranquilizingContext context, Collection<?> entities) {
     List<TranquilModelEntity> result = new ArrayList<TranquilModelEntity>();
     for (Object entity : entities) {
-      result.add(tranquilizeEntity(path, entity));
+      result.add(tranquilizeEntity(context, entity));
     }
     return result;
   }
@@ -291,14 +327,14 @@ public class TranquilityImpl implements Tranquility {
     return Character.toUpperCase(string.charAt(0)) + string.substring(1);
   }
   
-  private List<Instruction> getInstructionsList(String path) {
-    List<Instruction> instructions = this.instructions.get(path);
-    if (instructions == null) {
-      instructions = new ArrayList<Instruction>();
-      this.instructions.put(path, instructions);
+  private List<Instruction> resolveInstructions(TranquilizingContext context) {
+    List<Instruction> result = new ArrayList<Instruction>();
+    for (InstructionItem item : instructions) {
+      if (item.getSelector().match(context))
+        result.add(item.getInstruction());
     }
     
-    return instructions;
+    return result;
   }
 
   private String[] getModelProperties(Class<?> modelClass) {
@@ -321,7 +357,26 @@ public class TranquilityImpl implements Tranquility {
     return entityClass.isAnnotationPresent(TranquilEntity.class) || entityClass.isAnnotationPresent(Entity.class);
   }
 
-  private Map<String, List<Instruction>> instructions = new HashMap<String, List<Instruction>>();
+  private List<InstructionItem> instructions = new ArrayList<>();
   private PropertyAccessor propertyAccessor;
   private TranquilityEntityFactory tranquilityEntityFactory;
+  
+  private class InstructionItem {
+    
+    public InstructionItem(InstructionSelector selector, Instruction instruction) {
+      this.selector = selector;
+      this.instruction = instruction;
+    }
+    
+    public Instruction getInstruction() {
+      return instruction;
+    }
+    
+    public InstructionSelector getSelector() {
+      return selector;
+    }
+    
+    private Instruction instruction;
+    private InstructionSelector selector;
+  }
 }

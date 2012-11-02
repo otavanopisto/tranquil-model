@@ -6,20 +6,6 @@ import java.lang.reflect.Method;
 import org.apache.commons.lang3.StringUtils;
 
 public class PropertyAccessor {
-
-//  public Map<String, Object> extractProperties(Object object, List<String> properties) {
-//    return extractProperties(object, properties, true);
-//  }
-//  
-//  public Map<String, Object> extractProperties(Object object, List<String> properties, boolean preferGetter) {
-//    Map<String, Object> result = new HashMap<String, Object>();
-//    
-//    for (String property : properties) {
-//      result.put(property, extractProperty(object, property, preferGetter));
-//    }
-//
-//    return result;
-//  }
   
   public void storeProperty(Object object, String property, Object value) {
     storeProperty(object, property, value, true);
@@ -78,6 +64,19 @@ public class PropertyAccessor {
     } catch (Exception e) {
       return null;
     }
+  }
+  
+  public Class<?> getFieldType(Class<?> entityClass, String property) {
+    Method getterMethod = getMethod(entityClass, "get" + StringUtils.capitalize(property));
+    if (getterMethod != null) {
+      return getterMethod.getReturnType();
+    }
+    
+    Field field = getField(entityClass, property);
+    if (field != null) 
+      return field.getType();
+    
+    return null;
   }
 
   private Method getMethod(Class<?> entityClass, String name, Class<?>... parameterTypes) {
