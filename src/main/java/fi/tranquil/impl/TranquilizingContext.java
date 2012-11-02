@@ -2,9 +2,22 @@ package fi.tranquil.impl;
 
 public class TranquilizingContext {
 
-  public TranquilizingContext(Class<?> entityClass, String path) {
+  public TranquilizingContext(TranquilizingContext parentContext, Class<?> entityClass, Object entityValue, String path) {
+    this.entityValue = entityValue;
     this.entityClass = entityClass;
     this.path = path;
+  }
+  
+  public TranquilizingContext(TranquilizingContext parentContext, Class<?> entityClass, String path) {
+    this(parentContext, entityClass, null, path);
+  }
+  
+  public TranquilizingContext(Class<?> entityClass, Object entityValue, String path) {
+    this(null, entityClass, entityValue, path);
+  }
+
+  public TranquilizingContext(Class<?> entityClass, String path) {
+    this(null, entityClass, null, path);
   }
   
   public Class<?> getEntityClass() {
@@ -15,6 +28,14 @@ public class TranquilizingContext {
     this.entityClass = entityClass;
   }
   
+  public Object getEntityValue() {
+    return entityValue;
+  }
+  
+  public void setEntityValue(Object entityValue) {
+    this.entityValue = entityValue;
+  }
+  
   public String getPath() {
     return path;
   }
@@ -23,6 +44,12 @@ public class TranquilizingContext {
     this.path = path;
   }
   
+  public TranquilizingContext getParentContext() {
+    return parentContext;
+  }
+  
   private String path;
   private Class<?> entityClass;
+  private Object entityValue;
+  private TranquilizingContext parentContext;
 }

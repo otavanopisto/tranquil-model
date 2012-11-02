@@ -1,8 +1,16 @@
 package fi.tranquil.instructions;
 
-public interface PropertyInjectInstruction extends Instruction {
+import fi.tranquil.impl.TranquilizingContext;
+
+public interface PropertyInjectInstruction <T> extends Instruction {
 
   public String getName();
-  public Object getValue();
+  public ValueGetter<T> getValueGetter();
+  
+  public interface ValueGetter<T> {
+    
+    public T getValue(TranquilizingContext context);
+  
+  }
   
 }

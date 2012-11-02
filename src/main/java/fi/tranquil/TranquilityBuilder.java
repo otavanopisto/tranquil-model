@@ -4,6 +4,7 @@ import fi.tranquil.impl.TranquilityImpl;
 import fi.tranquil.instructions.PropertyInjectInstruction;
 import fi.tranquil.instructions.PropertySkipInstruction;
 import fi.tranquil.instructions.PropertyTypeInstruction;
+import fi.tranquil.instructions.PropertyInjectInstruction.ValueGetter;
 import fi.tranquil.instructions.impl.PropertyInjectInstructionImpl;
 import fi.tranquil.instructions.impl.PropertySkipInstructionImpl;
 import fi.tranquil.instructions.impl.PropertyTypeInstructionImpl;
@@ -29,8 +30,8 @@ public class TranquilityBuilder {
     return new PropertySkipInstructionImpl();
   }
 
-  public PropertyInjectInstruction createPropetyInjectInstruction(String name, Object value) {
-    return new PropertyInjectInstructionImpl(name, value);
+  public <T> PropertyInjectInstruction<T> createPropetyInjectInstruction(String name, ValueGetter<T> valueGetter) {
+    return new PropertyInjectInstructionImpl<T>(name, valueGetter);
   }
   
   

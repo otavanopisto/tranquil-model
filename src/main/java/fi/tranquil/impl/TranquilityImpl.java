@@ -1,5 +1,6 @@
 package fi.tranquil.impl;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import fi.tranquil.instructions.Instruction;
 import fi.tranquil.instructions.InstructionSelector;
 import fi.tranquil.instructions.PathInstructionSelector;
 import fi.tranquil.instructions.PropertyInjectInstruction;
+import fi.tranquil.instructions.PropertyInjectInstruction.ValueGetter;
 import fi.tranquil.instructions.PropertySkipInstruction;
 import fi.tranquil.instructions.PropertyTypeInstruction;
 import fi.tranquil.processing.PropertyAccessor;
@@ -43,7 +45,7 @@ public class TranquilityImpl implements Tranquility {
   @Override
   public TranquilModelEntity entity(Object entity) {
     Class<?> entityClass = entity.getClass();
-    return tranquilizeEntity(new TranquilizingContext(entityClass, ""), entity);
+    return tranquilizeEntity(new TranquilizingContext(entityClass, entity, ""), entity);
   }
    
   @Override
@@ -56,7 +58,7 @@ public class TranquilityImpl implements Tranquility {
     
     Class<?> entityClass = entities[0].getClass();
     
-    return tranquilizeEntities(new TranquilizingContext(entityClass, ""), entities);
+    return tranquilizeEntities(new TranquilizingContext(entityClass, entities, ""), entities);
   }
   
   @Override
@@ -70,7 +72,7 @@ public class TranquilityImpl implements Tranquility {
     
     Class<?> entityClass = entities.iterator().next().getClass();
     
-    return tranquilizeEntities(new TranquilizingContext(entityClass, ""), entities);
+    return tranquilizeEntities(new TranquilizingContext(entityClass, entities, ""), entities);
   }
   
   @Override
@@ -99,7 +101,7 @@ public class TranquilityImpl implements Tranquility {
     
     Class<?> tranquilModelClass = tranquilityEntityFactory.findTranquileModel(entity.getClass(), type);
     if (tranquilModelClass != null) {
-      Map<String, Object> injectedProperties = resolveInjectedProperties(pathInstructions);
+      Map<String, PropertyInjectInstruction.ValueGetter<?>> injectedProperties = resolveInjectedProperties(pathInstructions);
       TranquilModelEntity tranquilModel = getTranquilModelEntity(tranquilModelClass, injectedProperties);
       
       do {
@@ -109,13 +111,14 @@ public class TranquilityImpl implements Tranquility {
         for (String modelProperty : modelProperties) {
           Class<?> propertyClass = propertyAccessor.getFieldType(entity.getClass(), modelProperty);
           String propertyPath = ("".equals(context.getPath()) ? "" : context.getPath() + ".") + modelProperty;
-          TranquilizingContext propertyContext = new TranquilizingContext(propertyClass, propertyPath);
+          TranquilizingContext propertyContext = new TranquilizingContext(context, propertyClass, null, propertyPath);
           List<Instruction> propertyInstructions = resolveInstructions(propertyContext);
           
           boolean skip = resolveSkip(propertyInstructions);
           if (!skip) {
             Object entityValue = propertyAccessor.extractProperty(entity, modelProperty);
             if (entityValue != null) {
+              propertyContext.setEntityValue(entityValue);
               Class<?> entityClass = entityValue.getClass();
               
               if (isEntity(entityClass)) {
@@ -206,7 +209,8 @@ public class TranquilityImpl implements Tranquility {
       // Inject injected properties into model class
       Set<String> injectedPropertyKeys = injectedProperties.keySet();
       for (String injectedPropertyKey : injectedPropertyKeys) {
-        propertyAccessor.storeProperty(tranquilModel, injectedPropertyKey, injectedProperties.get(injectedPropertyKey)); 
+        ValueGetter<?> valueGetter = injectedProperties.get(injectedPropertyKey);
+        propertyAccessor.storeProperty(tranquilModel, injectedPropertyKey, valueGetter.getValue(context)); 
       }
 
       return tranquilModel;
@@ -253,22 +257,23 @@ public class TranquilityImpl implements Tranquility {
     return defaultType;
   }
   
-  private Map<String, Object> resolveInjectedProperties(List<Instruction> instructions) {
-    Map<String, Object> injectedProperties = new HashMap<>();
+  private Map<String, PropertyInjectInstruction.ValueGetter<?>> resolveInjectedProperties(List<Instruction> instructions) {
+    Map<String, PropertyInjectInstruction.ValueGetter<?>> injectedProperties = new HashMap<>();
   
     // Iterate over instructions to find injected properties
     
     for (Instruction instruction : instructions) {
       if (instruction instanceof PropertyInjectInstruction) {
-        PropertyInjectInstruction injectInstruction = (PropertyInjectInstruction) instruction;
-        injectedProperties.put(injectInstruction.getName(), injectInstruction.getValue());
+        PropertyInjectInstruction<?> injectInstruction = (PropertyInjectInstruction<?>) instruction;
+        PropertyInjectInstruction.ValueGetter<?> valueGetter = injectInstruction.getValueGetter();
+        injectedProperties.put(injectInstruction.getName(), valueGetter);
       }
     }
     
     return injectedProperties;
   }
 
-  private TranquilModelEntity getTranquilModelEntity(Class<?> tranquilModelClass, Map<String, Object> injectedProperties) {
+  private TranquilModelEntity getTranquilModelEntity(Class<?> tranquilModelClass, Map<String, PropertyInjectInstruction.ValueGetter<?>> injectedProperties) {
     
     try {
       // If no injected properties have been found, we can use original class
@@ -285,8 +290,9 @@ public class TranquilityImpl implements Tranquility {
         CtClass extendedCtClass = classPool.makeClass(tranquilModelClass.getName() + "$tranquil-" + UUID.randomUUID().toString(), originalCtClass);
         
         for (String injectedPropertyKey : injectedPropertyKeys) {
-          Object injectedPropertyValue = injectedProperties.get(injectedPropertyKey);
-          Class<?> injectedPropertyType = injectedPropertyValue.getClass();
+          ValueGetter<?> injectedValueGetter = injectedProperties.get(injectedPropertyKey);
+          Method getValueMethod = injectedValueGetter.getClass().getMethod("getValue", TranquilizingContext.class);
+          Class<?> injectedPropertyType = getValueMethod.getReturnType();
           String capitalizedPropertyKey = capitalize(injectedPropertyKey);
           
           // Field
@@ -314,12 +320,21 @@ public class TranquilityImpl implements Tranquility {
     } catch (CannotCompileException e) {
       // Javassist could not compile extended class
       throw new RuntimeException(e);
+    } catch (NoSuchMethodException e) {
+     // Could not find value getter getMethod
+      throw new RuntimeException(e);
+    } catch (SecurityException e) {
+      // Could not find value getter getMethod
+      throw new RuntimeException(e);
     }
   }
 
-  private ClassPool getClassPool(Class<?> tranquilModelClass) {
-    ClassPool classPool = ClassPool.getDefault();
-    classPool.insertClassPath(new ClassClassPath(tranquilModelClass));
+  private synchronized ClassPool getClassPool(Class<?> tranquilModelClass) {
+    if (classPool == null) {
+      classPool = ClassPool.getDefault();
+      classPool.insertClassPath(new ClassClassPath(tranquilModelClass));
+    }
+    
     return classPool;
   }
   
@@ -360,6 +375,7 @@ public class TranquilityImpl implements Tranquility {
   private List<InstructionItem> instructions = new ArrayList<>();
   private PropertyAccessor propertyAccessor;
   private TranquilityEntityFactory tranquilityEntityFactory;
+  private static ClassPool classPool = null;
   
   private class InstructionItem {
     

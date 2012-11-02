@@ -2,11 +2,11 @@ package fi.tranquil.instructions.impl;
 
 import fi.tranquil.instructions.PropertyInjectInstruction;
 
-public class PropertyInjectInstructionImpl implements PropertyInjectInstruction {
+public class PropertyInjectInstructionImpl<T> implements PropertyInjectInstruction<T> {
   
-  public PropertyInjectInstructionImpl(String name, Object value) {
+  public PropertyInjectInstructionImpl(String name, fi.tranquil.instructions.PropertyInjectInstruction.ValueGetter<T> valueGetter) {
     this.name = name;
-    this.value = value;
+    this.valueGetter = valueGetter;
   }
   
   @Override
@@ -15,11 +15,10 @@ public class PropertyInjectInstructionImpl implements PropertyInjectInstruction 
   }
   
   @Override
-  public Object getValue() {
-    return value;
+  public fi.tranquil.instructions.PropertyInjectInstruction.ValueGetter<T> getValueGetter() {
+    return valueGetter;
   }
   
   private String name;
-  private Object value;
-
+  private fi.tranquil.instructions.PropertyInjectInstruction.ValueGetter<T> valueGetter;
 }
