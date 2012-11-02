@@ -1,7 +1,9 @@
 package fi.tranquil;
 
+import fi.tranquil.instructions.PropertyInjectInstruction;
 import fi.tranquil.instructions.PropertySkipInstruction;
 import fi.tranquil.instructions.PropertyTypeInstruction;
+import fi.tranquil.instructions.impl.PropertyInjectInstructionImpl;
 import fi.tranquil.instructions.impl.PropertySkipInstructionImpl;
 import fi.tranquil.instructions.impl.PropertyTypeInstructionImpl;
 import fi.tranquil.processing.PropertyAccessor;
@@ -25,6 +27,11 @@ public class TranquilityBuilder {
   public PropertySkipInstruction createPropetySkipInstruction() {
     return new PropertySkipInstructionImpl();
   }
+
+  public PropertyInjectInstruction createPropetyInjectInstruction(String name, Object value) {
+    return new PropertyInjectInstructionImpl(name, value);
+  }
+  
   
   private TranquilityEntityFactory tranquilityEntityFactory;
   private PropertyAccessor propertyAccessor;
