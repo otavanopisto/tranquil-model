@@ -97,12 +97,12 @@ public class TranquilityImpl implements Tranquility {
   }
   
   private TranquilModelEntity tranquilizeEntity(TranquilizingContext context, Object entity) {
-    List<Instruction> pathInstructions = resolveInstructions(context);
-    TranquilModelType type = resolveEntityType(pathInstructions, TranquilModelType.COMPACT);
+    List<Instruction> instructions = resolveInstructions(context);
+    TranquilModelType type = resolveEntityType(instructions, TranquilModelType.COMPACT);
     
-    Class<?> tranquilModelClass = tranquilityEntityFactory.findTranquileModel(entity.getClass(), type);
+    Class<?> tranquilModelClass = tranquilityEntityFactory.findTranquilModel(entity.getClass(), type);
     if (tranquilModelClass != null) {
-      Map<String, PropertyInjectInstruction.ValueGetter<?>> injectedProperties = resolveInjectedProperties(pathInstructions);
+      Map<String, PropertyInjectInstruction.ValueGetter<?>> injectedProperties = resolveInjectedProperties(instructions);
       TranquilModelEntity tranquilModel = getTranquilModelEntity(tranquilModelClass, injectedProperties);
       
       do {
@@ -192,10 +192,6 @@ public class TranquilityImpl implements Tranquility {
                     propertyAccessor.storeProperty(tranquilModel, modelProperty, tranquilizedEntities);
                   break;
                 }
-              	
-              	TranquilModelEntity[] tranquilizedEntities = tranquilizeEntities(propertyContext, (Object[]) entityValue);
-                propertyAccessor.storeProperty(tranquilModel, modelProperty, tranquilizedEntities);
-
               } else {
                 // Simple properties are moved as is.
                 propertyAccessor.storeProperty(tranquilModel, modelProperty, entityValue);

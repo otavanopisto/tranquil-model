@@ -10,11 +10,7 @@ public class ClassInstructionSelector implements InstructionSelector {
   
   @Override
   public boolean match(TranquilizingContext context) {
-    if (entityClass == null) {
-      return context.getEntityClass() == null;
-    }
-    
-    if (context.getEntityClass() == null) {
+    if ((entityClass == null)||(context.getEntityClass() == null)) {
       return false;
     }
     

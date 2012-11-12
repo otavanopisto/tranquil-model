@@ -3,6 +3,7 @@ package fi.tranquil;
 public class TranquilizingContext {
 
   public TranquilizingContext(TranquilizingContext parentContext, Class<?> entityClass, Object entityValue, String path) {
+    this.parentContext = parentContext;
     this.entityValue = entityValue;
     this.entityClass = entityClass;
     this.path = path;

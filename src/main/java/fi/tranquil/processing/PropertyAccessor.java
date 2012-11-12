@@ -28,7 +28,7 @@ public class PropertyAccessor {
   
   private Method findSetter(Class<?> objectClass, String property, Class<?> valueClass) {
     Method setterMethod = getMethod(objectClass, "set" + StringUtils.capitalize(property), valueClass);
-    if (setterMethod == null && valueClass.getSuperclass() != null && !valueClass.getSuperclass().equals(Object.class)) {
+    if (setterMethod == null && valueClass.getSuperclass() != null && !valueClass.getClass().equals(Object.class)) {
       return findSetter(objectClass, property, valueClass.getSuperclass());
     }
     

@@ -10,8 +10,8 @@ public class TranquilityEntityFactory {
     this.completeLookup = completeLookup;
   }
   
-  public Class<?> findTranquileModel(Class<?> entity, TranquilModelType type) {
-    return getLookup(type).findTranquileModel(entity);
+  public Class<?> findTranquilModel(Class<?> entity, TranquilModelType type) {
+    return getLookup(type).findTranquilModel(entity);
   }
   
   private EntityLookup getLookup(TranquilModelType type) {
