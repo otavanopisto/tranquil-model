@@ -1,9 +1,6 @@
 package fi.tranquil;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
-
+import fi.tranquil.processing.EntityLookup;
 import fi.tranquil.processing.PropertyAccessor;
 import fi.tranquil.processing.TranquilityEntityFactory;
 
@@ -12,9 +9,9 @@ public class TranquilityBuilderFactory {
   public TranquilityBuilderFactory() {
     this(new PropertyAccessor(), 
         new TranquilityEntityFactory(
-          getLookup("tranquile-entities-base.properties"), 
-          getLookup("tranquile-entities-compact.properties"), 
-          getLookup("tranquile-entities-complete.properties")));
+          getLookup("fi.tranquil.BaseLookup"), 
+          getLookup("fi.tranquil.CompactLookup"), 
+          getLookup("fi.tranquil.CompleteLookup")));
   }
   
   public TranquilityBuilderFactory(PropertyAccessor propertyAccessor, TranquilityEntityFactory tranquilityEntityFactory) {
@@ -26,17 +23,12 @@ public class TranquilityBuilderFactory {
     return new TranquilityBuilder(propertyAccessor, tranquilityEntityFactory);
   }
 
-  private static Properties getLookup(String name) {
-    InputStream resourceStream = TranquilityBuilder.class.getClassLoader().getResourceAsStream(name);
-    Properties lookup = new Properties();
-    
+  private static EntityLookup getLookup(String name) {
     try {
-      lookup.load(resourceStream);
-      resourceStream.close();
-    } catch (IOException e) {
+      return (EntityLookup) TranquilityBuilder.class.getClassLoader().loadClass(name).newInstance();
+    } catch (Exception e) {
+      return null;
     }
-
-    return lookup;
   }
   
   private TranquilityEntityFactory tranquilityEntityFactory;
