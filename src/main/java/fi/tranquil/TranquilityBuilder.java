@@ -22,15 +22,15 @@ public class TranquilityBuilder {
     return new TranquilityImpl(propertyAccessor, tranquilityEntityFactory);
   }
   
-  public PropertyTypeInstruction createPropetyTypeInstruction(TranquilModelType type) {
+  public PropertyTypeInstruction createPropertyTypeInstruction(TranquilModelType type) {
     return new PropertyTypeInstructionImpl(type);
   }
 
-  public PropertySkipInstruction createPropetySkipInstruction() {
+  public PropertySkipInstruction createPropertySkipInstruction() {
     return new PropertySkipInstructionImpl();
   }
 
-  public <T> PropertyInjectInstruction<T> createPropetyInjectInstruction(String name, ValueGetter<T> valueGetter) {
+  public <T> PropertyInjectInstruction<T> createPropertyInjectInstruction(String name, ValueGetter<T> valueGetter) {
     return new PropertyInjectInstructionImpl<T>(name, valueGetter);
   }
   
