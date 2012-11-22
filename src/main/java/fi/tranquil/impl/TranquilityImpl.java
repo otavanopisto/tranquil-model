@@ -229,7 +229,10 @@ public class TranquilityImpl implements Tranquility {
   private Collection<TranquilModelEntity> tranquilizeEntities(TranquilizingContext context, Collection<?> entities) {
     List<TranquilModelEntity> result = new ArrayList<TranquilModelEntity>();
     for (Object entity : entities) {
-      result.add(tranquilizeEntity(context, entity));
+      TranquilModelEntity tranquilizeEntity = tranquilizeEntity(context, entity);
+
+      if (tranquilizeEntity != null)
+        result.add(tranquilizeEntity);
     }
     return result;
   }
