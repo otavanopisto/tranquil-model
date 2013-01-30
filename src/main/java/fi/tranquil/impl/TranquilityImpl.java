@@ -57,7 +57,7 @@ public class TranquilityImpl implements Tranquility {
     if (entities.length == 0)
       return new TranquilModelEntity[0];
     
-    Class<?> entityClass = entities[0].getClass();
+    Class<?> entityClass = entities.getClass();
     
     return tranquilizeEntities(new TranquilizingContext(entityClass, entities, ""), entities);
   }
@@ -71,7 +71,7 @@ public class TranquilityImpl implements Tranquility {
       return new ArrayList<>();
     }
     
-    Class<?> entityClass = entities.iterator().next().getClass();
+    Class<?> entityClass = entities.getClass();
     
     return tranquilizeEntities(new TranquilizingContext(entityClass, entities, ""), entities);
   }
@@ -220,7 +220,8 @@ public class TranquilityImpl implements Tranquility {
   private TranquilModelEntity[] tranquilizeEntities(TranquilizingContext context, Object[] entities) {
     TranquilModelEntity[] result = new TranquilModelEntity[entities.length];
     for (int i = 0, l = entities.length; i < l; i++) {
-      result[i] = tranquilizeEntity(context, entities[i]);
+      TranquilizingContext entityContext = new TranquilizingContext(context, entities[i].getClass(), entities[i], context.getPath());
+      result[i] = tranquilizeEntity(entityContext, entities[i]);
     }
 
     return result;
@@ -229,7 +230,8 @@ public class TranquilityImpl implements Tranquility {
   private Collection<TranquilModelEntity> tranquilizeEntities(TranquilizingContext context, Collection<?> entities) {
     List<TranquilModelEntity> result = new ArrayList<TranquilModelEntity>();
     for (Object entity : entities) {
-      TranquilModelEntity tranquilizeEntity = tranquilizeEntity(context, entity);
+      TranquilizingContext entityContext = new TranquilizingContext(context, entity.getClass(), entity, context.getPath());
+      TranquilModelEntity tranquilizeEntity = tranquilizeEntity(entityContext, entity);
 
       if (tranquilizeEntity != null)
         result.add(tranquilizeEntity);
