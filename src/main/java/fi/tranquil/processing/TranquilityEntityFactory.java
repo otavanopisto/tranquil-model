@@ -11,7 +11,23 @@ public class TranquilityEntityFactory {
   }
   
   public Class<?> findTranquilModel(Class<?> entity, TranquilModelType type) {
-    return getLookup(type).findTranquilModel(entity);
+    Class<?> tranquilModel = getLookup(type).findTranquilModel(entity);
+    if (tranquilModel != null)
+			return tranquilModel;
+    
+  	Class<?>[] interfaces = entity.getInterfaces();
+  	for (Class<?> intf : interfaces) {
+  		tranquilModel = findTranquilModel(intf, type);
+  		if (tranquilModel != null)
+  			return tranquilModel;
+  	}
+  	
+  	Class<?> superclass = entity.getSuperclass();
+  	if (superclass != null && !Object.class.equals(superclass)) {
+  		return findTranquilModel(superclass, type);
+  	}
+  	
+  	return null;
   }
   
   private EntityLookup getLookup(TranquilModelType type) {
