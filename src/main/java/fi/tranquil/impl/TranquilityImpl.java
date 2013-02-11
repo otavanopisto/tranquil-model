@@ -133,7 +133,7 @@ public class TranquilityImpl implements Tranquility {
                     // Compact versions contain only ids of entities. So we move only that.
                     Object id = propertyAccessor.extractProperty(entityValue, "id");
                     if (id != null) {
-                      propertyAccessor.storeProperty(tranquilModel, modelProperty + "Id", id);
+                      propertyAccessor.storeProperty(tranquilModel, modelProperty + "_id", id);
                     }
                   break;
                   case COMPLETE:
@@ -160,7 +160,7 @@ public class TranquilityImpl implements Tranquility {
                   	  ids.add(id);
                     }
                     
-                    propertyAccessor.storeProperty(tranquilModel, modelProperty + "Ids", ids);
+                    propertyAccessor.storeProperty(tranquilModel, modelProperty + "_ids", ids);
                   break;
                   case COMPLETE:
                     // Complete collections are stored as tranqulized entities
@@ -184,7 +184,7 @@ public class TranquilityImpl implements Tranquility {
                   	  ids[i] = id;
                   	}
                     
-                    propertyAccessor.storeProperty(tranquilModel, modelProperty + "Ids", ids);
+                    propertyAccessor.storeProperty(tranquilModel, modelProperty + "_ids", ids);
                   break;
                   case COMPLETE:
                     // Complete collections are stored as tranqualized entities
