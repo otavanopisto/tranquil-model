@@ -1,6 +1,7 @@
 package fi.tranquil.impl;
 
 import java.lang.reflect.Method;
+import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtField;
 import javassist.CtNewMethod;
+import javassist.LoaderClassPath;
 import javassist.NotFoundException;
 
 import javax.persistence.Entity;
@@ -306,7 +308,13 @@ public class TranquilityImpl implements Tranquility {
           extendedCtClass.addMethod(CtNewMethod.setter("set" + capitalizedPropertyKey, field));
         }
 
-        Class<?> extendedClass = extendedCtClass.toClass(getClass().getClassLoader(), getClass().getProtectionDomain());
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) {
+        	classLoader = getClass().getClassLoader();
+        }
+        
+        ProtectionDomain protectionDomain = tranquilModelClass.getProtectionDomain();
+        Class<?> extendedClass = extendedCtClass.toClass(classLoader, protectionDomain);
       
         return (TranquilModelEntity) extendedClass.newInstance();
       }
@@ -334,9 +342,19 @@ public class TranquilityImpl implements Tranquility {
   private synchronized ClassPool getClassPool(Class<?> tranquilModelClass) {
     if (classPool == null) {
       classPool = ClassPool.getDefault();
-      classPool.insertClassPath(new ClassClassPath(tranquilModelClass));
+      
+      ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+      if (contextClassLoader != null) {
+      	classPool.insertClassPath(new LoaderClassPath(contextClassLoader));
+      }
     }
     
+    try {
+			classPool.get(tranquilModelClass.getName());
+		} catch (NotFoundException e) {
+	    classPool.insertClassPath(new ClassClassPath(tranquilModelClass));
+		}
+
     return classPool;
   }
   
