@@ -1,5 +1,6 @@
 package fi.tranquil.impl;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
@@ -22,6 +23,7 @@ import javassist.NotFoundException;
 import javax.persistence.Entity;
 
 import fi.tranquil.TranquilEntity;
+import fi.tranquil.TranquilEntityResolver;
 import fi.tranquil.TranquilModel;
 import fi.tranquil.TranquilModelEntity;
 import fi.tranquil.TranquilModelType;
@@ -37,6 +39,7 @@ import fi.tranquil.instructions.PropertySkipInstruction;
 import fi.tranquil.instructions.PropertyTypeInstruction;
 import fi.tranquil.processing.PropertyAccessor;
 import fi.tranquil.processing.TranquilityEntityFactory;
+import fi.tranquil.processing.TranquilityExpandedField;
 
 public class TranquilityImpl implements Tranquility {
 
@@ -109,20 +112,33 @@ public class TranquilityImpl implements Tranquility {
       
       do {
         TranquilModel modelAnnotation = tranquilModelClass.getAnnotation(TranquilModel.class);
-
+        
         String[] modelProperties = getModelProperties(tranquilModelClass);
         for (String modelProperty : modelProperties) {
-          Class<?> propertyClass = propertyAccessor.getFieldType(entity.getClass(), modelProperty);
+          Object entityPropertyValue = null;
+          boolean expandedProperty = (modelAnnotation.entityType() == TranquilModelType.COMPLETE) && isExpandedProperty(tranquilModelClass, modelProperty);
+
+          Class<?> propertyClass;
+          if (!expandedProperty)
+            propertyClass = propertyAccessor.getFieldType(entity.getClass(), modelProperty);
+          else {
+            entityPropertyValue = loadEntity(entity, tranquilModelClass, modelProperty);
+            propertyClass = entityPropertyValue.getClass();
+          }
+          
           String propertyPath = ("".equals(context.getPath()) ? "" : context.getPath() + ".") + modelProperty;
           TranquilizingContext propertyContext = new TranquilizingContext(context, propertyClass, null, propertyPath);
           List<Instruction> propertyInstructions = resolveInstructions(propertyContext);
           
           boolean skip = resolveSkip(propertyInstructions);
           if (!skip) {
-            Object entityValue = propertyAccessor.extractProperty(entity, modelProperty);
-            if (entityValue != null) {
-              propertyContext.setEntityValue(entityValue);
-              Class<?> entityClass = entityValue.getClass();
+
+            if (!expandedProperty)
+              entityPropertyValue = propertyAccessor.extractProperty(entity, modelProperty);
+            
+            if (entityPropertyValue != null) {
+              propertyContext.setEntityValue(entityPropertyValue);
+              Class<?> entityClass = entityPropertyValue.getClass();
               
               if (isEntity(entityClass)) {
                 // Entity properties need to be converted into their tranquilized counterparts or id properties
@@ -133,13 +149,13 @@ public class TranquilityImpl implements Tranquility {
                   break;
                   case COMPACT:
                     // Compact versions contain only ids of entities. So we move only that.
-                    Object id = propertyAccessor.extractProperty(entityValue, "id");
+                    Object id = propertyAccessor.extractProperty(entityPropertyValue, "id");
                     if (id != null) {
                       propertyAccessor.storeProperty(tranquilModel, modelProperty + "_id", id);
                     }
                   break;
                   case COMPLETE:
-                    TranquilModelEntity tranquilizedEntity = tranquilizeEntity(propertyContext, entityValue);
+                    TranquilModelEntity tranquilizedEntity = tranquilizeEntity(propertyContext, entityPropertyValue);
                     if (tranquilizedEntity != null) {
                       propertyAccessor.storeProperty(tranquilModel, modelProperty, tranquilizedEntity);
                     }
@@ -149,14 +165,14 @@ public class TranquilityImpl implements Tranquility {
                 switch (modelAnnotation.entityType()) {
                   case BASE:
                     // Simple collections are copied "as-is"
-                    propertyAccessor.storeProperty(tranquilModel, modelProperty, entityValue);
+                    propertyAccessor.storeProperty(tranquilModel, modelProperty, entityPropertyValue);
                   break;
                   case COMPACT:
                     // Compact  collections are stored as lists of ids
 
                     List<Object> ids = new ArrayList<>();
                   	
-                    for (Object collectionItem : (Collection<?>) entityValue) {
+                    for (Object collectionItem : (Collection<?>) entityPropertyValue) {
                   	Object id = propertyAccessor.extractProperty(collectionItem, "id");
                   	if (id != null)
                   	  ids.add(id);
@@ -166,7 +182,7 @@ public class TranquilityImpl implements Tranquility {
                   break;
                   case COMPLETE:
                     // Complete collections are stored as tranqulized entities
-                    Collection<TranquilModelEntity> tranquilizedEntities = tranquilizeEntities(propertyContext, (Collection<?>) entityValue);
+                    Collection<TranquilModelEntity> tranquilizedEntities = tranquilizeEntities(propertyContext, (Collection<?>) entityPropertyValue);
                     propertyAccessor.storeProperty(tranquilModel, modelProperty, tranquilizedEntities);
                   break;
                 }
@@ -175,11 +191,11 @@ public class TranquilityImpl implements Tranquility {
                 switch (modelAnnotation.entityType()) {
                   case BASE:
                     // Simple arrays are copied "as-is"
-                    propertyAccessor.storeProperty(tranquilModel, modelProperty, entityValue);
+                    propertyAccessor.storeProperty(tranquilModel, modelProperty, entityPropertyValue);
                   break;
                   case COMPACT:
                     // Compact arrays are stored as arrays of ids
-                    Object[] listItems = (Object[]) entityValue;
+                    Object[] listItems = (Object[]) entityPropertyValue;
                     Object[] ids = new Object[listItems.length];
                   	for (int i = 0, l = listItems.length; i < l; i++) {
                       Object id = propertyAccessor.extractProperty(listItems[i], "id");
@@ -190,13 +206,13 @@ public class TranquilityImpl implements Tranquility {
                   break;
                   case COMPLETE:
                     // Complete collections are stored as tranqualized entities
-                    Collection<TranquilModelEntity> tranquilizedEntities = tranquilizeEntities(propertyContext, (Collection<?>) entityValue);
+                    Collection<TranquilModelEntity> tranquilizedEntities = tranquilizeEntities(propertyContext, (Collection<?>) entityPropertyValue);
                     propertyAccessor.storeProperty(tranquilModel, modelProperty, tranquilizedEntities);
                   break;
                 }
               } else {
                 // Simple properties are moved as is.
-                propertyAccessor.storeProperty(tranquilModel, modelProperty, entityValue);
+                propertyAccessor.storeProperty(tranquilModel, modelProperty, entityPropertyValue);
               }
             }
           }
@@ -217,6 +233,42 @@ public class TranquilityImpl implements Tranquility {
       // TranquilModelEntity not found
       return null;
     }
+  }
+
+  private boolean isExpandedProperty(Class<?> tranquilModelClass, String modelProperty) {
+    try {
+      Field field = tranquilModelClass.getDeclaredField(modelProperty);
+      
+      return field.getAnnotation(TranquilityExpandedField.class) != null;
+    } catch (NoSuchFieldException e) {
+      e.printStackTrace();
+    } catch (SecurityException e) {
+      e.printStackTrace();
+    }
+    
+    return false;
+  }
+
+  private Object loadEntity(Object entity, Class<?> tranquilModelClass, String modelProperty) {
+    try {
+      TranquilityExpandedField tranquilityEntityField = tranquilModelClass.getDeclaredField(modelProperty).getAnnotation(TranquilityExpandedField.class);
+
+      Class<? extends TranquilEntityResolver> entityResolverClass = tranquilityEntityField.entityResolverClass();
+      
+      TranquilEntityResolver entityResolver = entityResolverClass.newInstance();
+      
+      return entityResolver.resolveEntity(entity, tranquilityEntityField.idProperty());
+    } catch (NoSuchFieldException e) {
+      e.printStackTrace();
+    } catch (SecurityException e) {
+      e.printStackTrace();
+    } catch (InstantiationException e) {
+      e.printStackTrace();
+    } catch (IllegalAccessException e) {
+      e.printStackTrace();
+    }
+    
+    return null;
   }
 
   private TranquilModelEntity[] tranquilizeEntities(TranquilizingContext context, Object[] entities) {
