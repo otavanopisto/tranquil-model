@@ -251,13 +251,28 @@ public class TranquilityImpl implements Tranquility {
 
   private Object loadEntity(Object entity, Class<?> tranquilModelClass, String modelProperty) {
     try {
-      TranquilityExpandedField tranquilityEntityField = tranquilModelClass.getDeclaredField(modelProperty).getAnnotation(TranquilityExpandedField.class);
+      Field field = tranquilModelClass.getDeclaredField(modelProperty);
 
+      TranquilityExpandedField tranquilityEntityField = field.getAnnotation(TranquilityExpandedField.class);
+      
       Class<? extends TranquilEntityResolver> entityResolverClass = tranquilityEntityField.entityResolverClass();
       
       TranquilEntityResolver entityResolver = entityResolverClass.newInstance();
       
-      return entityResolver.resolveEntity(entity, tranquilityEntityField.idProperty());
+      Object idProperty = propertyAccessor.extractProperty(entity, tranquilityEntityField.idProperty());
+
+      if (!isCollection(field.getType())) {
+        return entityResolver.resolveEntity(idProperty);
+      } else {
+        Collection<?> ids = (Collection<?>) idProperty;
+        List<Object> items = new ArrayList<>();
+        
+        for (Object id : ids) {
+          items.add(entityResolver.resolveEntity(id));
+        }
+        
+        return items; 
+      }
     } catch (NoSuchFieldException e) {
       e.printStackTrace();
     } catch (SecurityException e) {
