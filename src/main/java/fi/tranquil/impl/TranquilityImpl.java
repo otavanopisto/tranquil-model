@@ -140,7 +140,7 @@ public class TranquilityImpl implements Tranquility {
               propertyContext.setEntityValue(entityPropertyValue);
               Class<?> entityClass = entityPropertyValue.getClass();
               
-              if (isEntity(entityClass)) {
+              if (isEntity(entityPropertyValue)) {
                 // Entity properties need to be converted into their tranquilized counterparts or id properties
 
                 switch (modelAnnotation.entityType()) {
@@ -455,8 +455,35 @@ public class TranquilityImpl implements Tranquility {
     return java.util.Collection.class.isAssignableFrom(entityClass);
   }
 
-  private boolean isEntity(Class<?> entityClass) {
-    return entityClass.isAnnotationPresent(TranquilEntity.class) || entityClass.isAnnotationPresent(Entity.class);
+  
+  private boolean isEntity(Object entity) {
+    Class<?> entityClass = entity.getClass();
+
+    if (entityClass.isAnnotationPresent(TranquilEntity.class) || entityClass.isAnnotationPresent(Entity.class)) {
+      return true;
+    }
+
+    // Instrumented Hibernate Entities return false on isAnnotationPresent, so we
+    // need to check original class for the annotations. Unfortunately TranquilModel 
+    // does not see HibernateProxy class and we need to do this 
+    // the hard way (via Reflection API)
+    Object handler = propertyAccessor.extractProperty(entity, "handler");
+    if (handler != null) {
+      if ("org.hibernate.proxy.pojo.javassist.JavassistLazyInitializer".equals(handler.getClass().getName())) {
+        String originalClassName = (String) propertyAccessor.extractProperty(handler, "entityName");
+        if (originalClassName != null) {
+          try {
+            entityClass = Class.forName(originalClassName);
+            if (entityClass.isAnnotationPresent(TranquilEntity.class) || entityClass.isAnnotationPresent(Entity.class)) {
+              return true;
+            }
+          } catch (ClassNotFoundException e) {
+          }
+        }
+      }
+    }
+
+    return false;
   }
 
   private List<InstructionItem> instructions = new ArrayList<>();
