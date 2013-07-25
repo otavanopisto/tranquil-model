@@ -4,7 +4,6 @@ public enum TranquilModelType {
 
   BASE,
   COMPACT,
-  COMPLETE,
-  UPDATE
+  COMPLETE
   
 }
